@@ -18,8 +18,6 @@
 
 from typing import Sequence, Tuple
 import numpy as np
-import cv2
-
 Image = np.ndarray
 
 
@@ -57,7 +55,8 @@ def analyze_z_stack(
 
     if from_rgb:
         images = np.array(
-            cv2.cvtcolor(image, cv2.COLOR_RGB2GRAY) for image in images
+            np.dot(image[...,:3], [0.2989, 0.5870, 0.1140]) for image in images
+            #cv2.cvtcolor(image, cv2.COLOR_RGB2GRAY) for image in images
         ).reshape(N, H, W)
     else:
         images = np.array(images).reshape(N, H, W)

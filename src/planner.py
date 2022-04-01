@@ -20,8 +20,9 @@ import sys
 from pathlib import Path
 from typing import List
 from time import sleep
-import cv2
 import api
+import matlab.engine
+from PIL import Image
 
 
 def _ack(prompt: str):
@@ -151,7 +152,9 @@ def main(
 
             # Move the microscope to the best focused position
             api.move_fine_focus(z_step_size * (n_z_stack - 1 - best_focused) / 2.0)
-            cv2.imwrite(str(output_dir / f"field_{i}_{j}.png"), images[best_focused])
+            #cv2.imwrite(str(output_dir / f"field_{i}_{j}.png"), images[best_focused])
+            pil_image = Image.fromarray(images[best_focused])
+            Image.save(str(output_dir / f"field_{i}_{j}.png"), pil_image)
 
             # Step one position
             api.move_y_axis(y_step_mm * y_direction)
@@ -178,3 +181,9 @@ if __name__ == "__main__":
         z_step_size=20,
         output_dir="out"
     )
+
+    # eng = matlab.engine.start_matlab()
+    # api.camera_controller_init(eng)
+    # data_ = api.take_image(eng)
+    # print(data_[0][0][0])
+    # eng.quit()
