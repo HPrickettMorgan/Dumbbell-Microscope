@@ -16,12 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 '''
 
+from errno import ENOMSG
 import sys
 from pathlib import Path
 from typing import List
 from time import sleep
-import cv2
 import api
+import matlab.engine
+from PIL import Image
 
 
 def _ack(prompt: str):
@@ -75,8 +77,10 @@ def _create_out_dir(output_dir: str) -> Path:
             ix += 1
             out_path = out_path.parent / (root + str(ix))
 
+    return out_path
 
-def _take_z_stack(n_z_stack: int, z_step_size: float, movement_sleep: float = 0.01) -> List[api.OpenCVImage]:
+
+def _take_z_stack(engine, n_z_stack: int, z_step_size: float, movement_sleep: float = 0) -> List[api.OpenCVImage]:
     '''Take a z-stack of images. Assumes the microscope is initially in the best guess for focus.
 
     :param n_z_stack: how many images in a z-stack to take per field.
@@ -92,13 +96,15 @@ def _take_z_stack(n_z_stack: int, z_step_size: float, movement_sleep: float = 0.
     sleep(movement_sleep * 3)
 
     # Take image at the top
-    images.append(api.take_image())
+    img = api.take_image(engine)
+    #print(img)
+    images.append(img)
 
     # Step down one step size and take image.
     for i in range(n_z_stack - 1):
         api.move_fine_focus(-z_step_size)
         sleep(movement_sleep)
-        images.append(api.take_image())
+        images.append(api.take_image(engine))
 
     # Move back to initial position.
     api.move_fine_focus(z_step_size * (n_z_stack - 1) / 2.0)
@@ -112,7 +118,8 @@ def main(
     n_fields_y: int,
     n_z_stack: int,
     z_step_size: float,
-    output_dir: str
+    output_dir: str,
+    engine
 ):
     '''The main control loop for the widget.
 
@@ -124,10 +131,10 @@ def main(
     :param z_step_size: the number of degrees to turn the fine focus knob per z-step.
     '''
 
-    _user_setup()
+    #_user_setup()
 
     print("Initializing camera module...")
-    api.camera_controller_init()
+    api.camera_controller_init(eng)
     print("Camera module initialized successfully!\n")
 
     print("Initializing stepper controller...")
@@ -146,12 +153,17 @@ def main(
     y_direction = 1
     for i in range(n_fields_x):
         for j in range(n_fields_y):
-            images = _take_z_stack(n_z_stack, z_step_size)
+            images = _take_z_stack(eng, n_z_stack, z_step_size)
+            #print(type(images), type(images[0]))
             _, best_focused = api.analyze_z_stack(images)
+            #best_focused = 2
 
             # Move the microscope to the best focused position
-            api.move_fine_focus(z_step_size * (n_z_stack - 1 - best_focused) / 2.0)
-            cv2.imwrite(str(output_dir / f"field_{i}_{j}.png"), images[best_focused])
+            api.move_fine_focus(z_step_size * ((n_z_stack - 1) / 2 - best_focused))
+            #cv2.imwrite(str(output_dir / f"field_{i}_{j}.png"), images[best_focused])
+            pil_image = Image.fromarray(images[best_focused])
+            pil_image.save(str(output_dir / f"field_{i}_{j}.png"))
+            #Image.imsave(str(output_dir / f"field_{i}_{j}.png"), pil_image)
 
             # Step one position
             api.move_y_axis(y_step_mm * y_direction)
@@ -169,12 +181,22 @@ def main(
 
 
 if __name__ == "__main__":
+
+    eng = matlab.engine.start_matlab()
+
     main(
-        x_travel_mm=20,
+        x_travel_mm=10,
         y_travel_mm=10,
-        n_fields_x=30,
+        n_fields_x=4,
         n_fields_y=5,
-        n_z_stack=7,
-        z_step_size=20,
-        output_dir="out"
+        n_z_stack=5,
+        z_step_size=9,
+        output_dir="out",
+        engine=eng
     )
+
+    #api.camera_controller_init(eng)
+    #data_ = api.take_image(eng)
+    #print(data_)
+
+    eng.quit()

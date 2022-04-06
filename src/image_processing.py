@@ -18,8 +18,6 @@
 
 from typing import Sequence, Tuple
 import numpy as np
-import cv2
-
 Image = np.ndarray
 
 
@@ -51,17 +49,16 @@ def analyze_z_stack(
     The first ndarray is the list of ranks, with the lowest ranked index representing the most in focus image.
     The second ndarray represents the raw metric calculated per image
     '''
+    print(type(images[0]))
+    images = np.stack(images, axis=0)
 
-    N = len(images)
-    H, W = images[0].shape
-
-    if from_rgb:
-        images = np.array(
-            cv2.cvtcolor(image, cv2.COLOR_RGB2GRAY) for image in images
-        ).reshape(N, H, W)
-    else:
-        images = np.array(images).reshape(N, H, W)
-
+    print(images.shape)
+    N, H, W, D = images.shape
+    #images.reshape(N, H, W, D)
+    images = np.dot(images, [0.2989, 0.5870, 0.1140])
+        #cv2.cvtcolor(image, cv2.COLOR_RGB2GRAY) for image in images
+    print(images.shape)
+        
     metric = algorithms[algorithm](images)
 
     order = metric.argsort()
